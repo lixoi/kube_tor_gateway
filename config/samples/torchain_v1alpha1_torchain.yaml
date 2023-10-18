@@ -1,0 +1,12 @@
+apiVersion: torchain.gate.way/v1alpha1
+kind: TorChain
+metadata:
+  labels:
+    app.kubernetes.io/name: torchain
+    app.kubernetes.io/instance: torchain-sample
+    app.kubernetes.io/part-of: tor-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: tor-operator
+  name: torchain-sample
+spec:
+  # TODO(user): Add fields here

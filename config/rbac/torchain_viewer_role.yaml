@@ -1,0 +1,27 @@
+# permissions for end users to view torchains.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: torchain-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: tor-operator
+    app.kubernetes.io/part-of: tor-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: torchain-viewer-role
+rules:
+- apiGroups:
+  - torchain.gate.way
+  resources:
+  - torchains
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - torchain.gate.way
+  resources:
+  - torchains/status
+  verbs:
+  - get
