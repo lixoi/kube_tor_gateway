@@ -33,15 +33,27 @@ spec:
           metadata:
             type: object
           spec:
-            description: TorChainSpec defines the desired state of TorChain
+            description: TorChainSpec defines the desired state of TorChain ожидаемое
+              состояние кластера (спецификация)
             properties:
-              foo:
+              deployments:
                 description: Foo is an example field of TorChain. Edit torchain_types.go
-                  to remove/update
-                type: string
+                  to remove/update Foo string `json:"foo,omitempty"` Deployments count
+                type: integer
+              keepalive:
+                description: Keepalive configuration
+                properties:
+                  enabled:
+                    description: Keep alive is enabled
+                    type: boolean
+                  interval:
+                    description: Keep alive messages interval in seconds
+                    type: integer
+                type: object
             type: object
           status:
-            description: TorChainStatus defines the observed state of TorChain
+            description: TorChainStatus defines the observed state of TorChain текущее
+              состояние кластера
             type: object
         type: object
     served: true

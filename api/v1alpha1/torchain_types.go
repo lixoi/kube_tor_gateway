@@ -29,6 +29,7 @@ type TorChainKeepAlive struct {
 	Enabled bool `json:"enabled,omitempty"`
 	// Keep alive messages interval in seconds
 	Interval int `json:"interval,omitempty"`
+	// Number of Node
 }
 
 // TorChainSpec defines the desired state of TorChain
@@ -43,6 +44,8 @@ type TorChainSpec struct {
 	Deployments int `json:"deployments,omitempty"`
 	// Keepalive configuration
 	Keepalive *TorChainKeepAlive `json:"keepalive,omitempty"`
+	// Lengh of chain
+	LengthChain int `json:"lengthchain,omitempty"`
 }
 
 // TorChainStatus defines the observed state of TorChain
@@ -50,6 +53,11 @@ type TorChainSpec struct {
 type TorChainStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// All tor nodes are prepared and ready
+	Deployed bool `json:"deployed"`
+	// How many tor nodes isn't available
+	BrokenNodes int `json:"brokenNodes"`
 }
 
 //+kubebuilder:object:root=true

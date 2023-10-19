@@ -19,7 +19,11 @@ package controllers
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,9 +37,14 @@ type TorChainReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// Описание разрешений (будут транслированы в роли)
 //+kubebuilder:rbac:groups=torchain.gate.way,resources=torchains,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=torchain.gate.way,resources=torchains/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=torchain.gate.way,resources=torchains/finalizers,verbs=update
+
+//+kubebuilder:rbac:groups=apps/v1,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps/v1,resources=pods,verbs=get;list;patch
+//+kubebuilder:rbac:groups=v1,resources=secrets,verbs=get;list;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -51,6 +60,25 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// TODO(user): your logic here
 
+	chain := &torchainv1alpha1.TorChain{}
+	err := r.Get(ctx, req.NamespacedName, chain)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			//кластер был удален, удалим развертывание
+			sts := &appsv1.StatefulSet{}
+			err = r.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, sts)
+			if err == nil {
+				err = r.Delete(ctx, sts)
+				if err == nil {
+					cm := &corev1.ConfigMap{}
+					err = r.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, cm)
+				}
+			}
+		}
+		//и завершаем reconfile успешно (или с ошибкой)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -58,5 +86,8 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *TorChainReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&torchainv1alpha1.TorChain{}).
+		// сущности в RC, которыми будем управлять
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }
