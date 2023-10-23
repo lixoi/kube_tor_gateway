@@ -23,13 +23,11 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// my custom struct
-type TorChainKeepAlive struct {
-	// Keep alive is enabled
-	Enabled bool `json:"enabled,omitempty"`
-	// Keep alive messages interval in seconds
-	Interval int `json:"interval,omitempty"`
-	// Number of Node
+type NodeChain struct {
+	// type of chain node: ovpn, wg, socks5
+	TypeNode string `json:"typenode,omitempty"`
+	// metric of bad connects
+	BadConnectsCounter int `json:"badconnectscounter,omitempty"`
 }
 
 // TorChainSpec defines the desired state of TorChain
@@ -38,13 +36,8 @@ type TorChainSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of TorChain. Edit torchain_types.go to remove/update
-	//Foo string `json:"foo,omitempty"`
 	// Deployments count
 	Deployments int `json:"deployments,omitempty"`
-	// Keepalive configuration
-	Keepalive *TorChainKeepAlive `json:"keepalive,omitempty"`
-	// Lengh of chain
 	LengthChain int `json:"lengthchain,omitempty"`
 }
 
@@ -56,8 +49,8 @@ type TorChainStatus struct {
 
 	// All tor nodes are prepared and ready
 	Deployed bool `json:"deployed"`
-	// How many tor nodes isn't available
-	BrokenNodes int `json:"brokenNodes"`
+	// List of Status Nodes
+	Nodes []*NodeChain `json:"nodechain,omitempty"`
 }
 
 //+kubebuilder:object:root=true

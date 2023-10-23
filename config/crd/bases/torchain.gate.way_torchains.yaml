@@ -37,23 +37,32 @@ spec:
               состояние кластера (спецификация)
             properties:
               deployments:
-                description: Foo is an example field of TorChain. Edit torchain_types.go
-                  to remove/update Foo string `json:"foo,omitempty"` Deployments count
+                description: Deployments count
                 type: integer
-              keepalive:
-                description: Keepalive configuration
-                properties:
-                  enabled:
-                    description: Keep alive is enabled
-                    type: boolean
-                  interval:
-                    description: Keep alive messages interval in seconds
-                    type: integer
-                type: object
+              lengthchain:
+                type: integer
             type: object
           status:
             description: TorChainStatus defines the observed state of TorChain текущее
               состояние кластера
+            properties:
+              deployed:
+                description: All tor nodes are prepared and ready
+                type: boolean
+              nodechain:
+                description: List of Status Nodes
+                items:
+                  properties:
+                    badconnectscounter:
+                      description: metric of bad connects
+                      type: integer
+                    typenode:
+                      description: 'type of chain node: ovpn, wg, socks5'
+                      type: string
+                  type: object
+                type: array
+            required:
+            - deployed
             type: object
         type: object
     served: true

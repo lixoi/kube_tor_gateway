@@ -6,6 +6,26 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - apps/v1
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps/v1
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - patch
+- apiGroups:
   - torchain.gate.way
   resources:
   - torchains
@@ -29,5 +49,16 @@ rules:
   - torchains/status
   verbs:
   - get
+  - patch
+  - update
+- apiGroups:
+  - v1
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
   - patch
   - update

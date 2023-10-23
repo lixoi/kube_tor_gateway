@@ -57,21 +57,19 @@ type TorChainReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-
 	// TODO(user): your logic here
-
 	chain := &torchainv1alpha1.TorChain{}
 	err := r.Get(ctx, req.NamespacedName, chain)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			//кластер был удален, удалим развертывание
-			sts := &appsv1.StatefulSet{}
-			err = r.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, sts)
+			//цепочка была удалена, удалим развертывание
+			sts := &appsv1.Deployment{}
+			err = r.Get(ctx, types.NamespacedName{Name: chain.Name, Namespace: chain.Namespace}, sts)
 			if err == nil {
 				err = r.Delete(ctx, sts)
 				if err == nil {
 					cm := &corev1.ConfigMap{}
-					err = r.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, cm)
+					err = r.Get(ctx, types.NamespacedName{Name: chain.Name, Namespace: chain.Namespace}, cm)
 				}
 			}
 		}
