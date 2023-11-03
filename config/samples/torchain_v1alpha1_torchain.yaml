@@ -10,3 +10,5 @@ metadata:
   name: torchain-sample
 spec:
   # TODO(user): Add fields here
+  labelchain: my_chain_gateway
+  lengthchain: 1

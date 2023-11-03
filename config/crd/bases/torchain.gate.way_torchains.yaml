@@ -36,10 +36,11 @@ spec:
             description: TorChainSpec defines the desired state of TorChain ожидаемое
               состояние кластера (спецификация)
             properties:
-              deployments:
-                description: Deployments count
-                type: integer
+              labelchain:
+                description: label of tor gateway
+                type: string
               lengthchain:
+                description: length of tor chain
                 type: integer
             type: object
           status:

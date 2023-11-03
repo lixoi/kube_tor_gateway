@@ -37,8 +37,12 @@ type TorChainSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Deployments count
-	Deployments int `json:"deployments,omitempty"`
+	// Deployments int    `json:"deployments,omitempty"`
+
+	// length of tor chain
 	LengthChain int `json:"lengthchain,omitempty"`
+	// label of tor gateway
+	LabelChain string `json:"labelchain,omitempty"`
 }
 
 // TorChainStatus defines the observed state of TorChain

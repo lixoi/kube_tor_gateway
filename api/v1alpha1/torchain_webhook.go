@@ -39,7 +39,7 @@ func (r *TorChain) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-torchain-gate-way-v1alpha1-torchain,mutating=true,failurePolicy=fail,sideEffects=None,groups=torchain.gate.way,resources=torchains,verbs=create;update,versions=v1alpha1,name=mtorchain.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-torchain-gate-way-v1alpha1-torchain,mutating=true,failurePolicy=fail,sideEffects=None,groups=torchain.gate.way,resources=torchains,verbs=create;update;list,versions=v1alpha1,name=mtorchain.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &TorChain{}
 
@@ -47,7 +47,17 @@ var _ webhook.Defaulter = &TorChain{}
 func (r *TorChain) Default() {
 	torchainlog.Info("default", "name", r.Name)
 
+	// init sidecar-container in all Nodes
+	/*
+		podList := &corev1.PodList{}
+		opts := []client.ListOption{
+			client.InNamespace(r.Namespace),
+			client.MatchingLabels{"instance": request.NamespacedName.Name},
+			client.MatchingFields{"status.phase": "Running"},
+		}
+	*/
 	// TODO(user): fill in your defaulting logic.
+
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -57,9 +67,9 @@ var _ webhook.Validator = &TorChain{}
 
 func (r *TorChain) validateDeploymens() error {
 	var allErrs field.ErrorList
-	if r.Spec.Deployments != r.Spec.LengthChain {
+	if r.Status.Deployed {
 		fldPath := field.NewPath("spec").Child("deployments")
-		allErrs = append(allErrs, field.Invalid(fldPath, strconv.Itoa(r.Spec.Deployments), "Count of deployments isn't equal length of chain"))
+		allErrs = append(allErrs, field.Invalid(fldPath, r.Status.Deployed, "Count of deployments isn't equal length of chain"))
 	}
 	for i, v := range r.Status.Nodes {
 		if v.BadConnectsCounter > 10 {

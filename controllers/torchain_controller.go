@@ -62,7 +62,7 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	err := r.Get(ctx, req.NamespacedName, chain)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			//цепочка была удалена, удалим развертывание
+			// цепочка была удалена, удалим развертывание
 			sts := &appsv1.Deployment{}
 			err = r.Get(ctx, types.NamespacedName{Name: chain.Name, Namespace: chain.Namespace}, sts)
 			if err == nil {
@@ -73,7 +73,7 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				}
 			}
 		}
-		//и завершаем reconfile успешно (или с ошибкой)
+		// и завершаем reconfile успешно (или с ошибкой)
 		return ctrl.Result{}, err
 	}
 

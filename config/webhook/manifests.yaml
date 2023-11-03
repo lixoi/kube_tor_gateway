@@ -22,6 +22,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - list
     resources:
     - torchains
   sideEffects: None
