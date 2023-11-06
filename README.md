@@ -1,101 +1,36 @@
-# tor-operator
-// TODO(user): Add simple overview of use/purpose
+# VPN шлюз с множественной инкапсуляцией (аналог TOR-сети)
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+Цель данного решения - продемонстрировать нестандартное использование системы управления контейнерами на базе Kubernetes, 
+так как k8s (по мнению явторов) - это SDK :)
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+# Начальные условия 
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+Для реализации луковичной маршрутизации (построение VPN цепочки с произвольным количеством узлов) необходимо использовать CNI Multus (для задания маршрутов на L3 уровне) + базовый плагин с поддержкой NP (для сетевой изоляции шлюзов на уровне NS), например Calico
 
-```sh
-kubectl apply -f config/samples/
-```
+Предполагается использовать протоколы OnenVPN и Wireguard в любом сочетании.
 
-2. Build and push your image to the location specified by `IMG`:
+# Функциональность
 
-```sh
-make docker-build docker-push IMG=<some-registry>/tor-operator:tag
-```
+Развертывание производится через helm chart (папка helm).
+В templates задаются сетевые интерфейсы через NetworkAttachmentDefinition и параметры узлов цепочки через CRD. Параметры подключения хранятся в secrets (Vault) и монтируются как файл в файловой системе ПОДа.
 
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+Если какой-либо из узлов цепочти не может подключиться к серверу, то оператор берет из Vault новые параметры подключение и перезапускает узел.
 
-```sh
-make deploy IMG=<some-registry>/tor-operator:tag
-```
+Так как для контейнеров необходимы привилегии NET_ADMIN, docker-образы собраны через nixpkgs docker build (папки ovpn-build-image и wguard-build-image) с минимальным окружением. Данный подход позволяет минимизировать вектор атаки через VPN-клиента. 
+Использование distroless-образов приводит к необходимости запускать kube-оператором sidecar-контейнеры (busybox) c health check для отслеживания состояния работы ПОДа (узла цепочки).
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+VPN-клиенты логируют сообщения в stdout.
 
-```sh
-make uninstall
-```
+# Этапы работ: 
 
-### Undeploy controller
-UnDeploy the controller from the cluster:
+На первом этапе проводились тестовыеы испытания, была развернута цепочка client1-client2-client3-server3-server2-server1 через docker-compose (в проекте не представлено).
+На втором была поднята K8s через kubeadm (папка K8s). Облачные провайдеры не подходят из-за CNI Multus.
+На третем разработан helm chart (папка helm) развертования цепочки, состоящей из 3-х OpenVPN узлов.
 
-```sh
-make undeploy
-```
+На текущем этапе идет разработка kube-оператора (ветка feature проекта) для рализации логики поддержания vpn-цепочки в рабочем состоянии (см. Функциональность).
+На завершающем - интеграция с ELK и Vault.
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
-
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
-
-### Test It Out
-1. Install the CRDs into the cluster:
-
-```sh
-make install
-```
-
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
-
-```sh
-make run
-```
-
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests
-```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2023 Lixoi.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-## Command steps
-
-operator-sdk init --domain gate.way --owner "Lixoi" --plugins go/v3
-operator-sdk create api --group torchain --version v1alpha1 --kind TorChain --resource --controller
-// edit api/v1alpha1/totchain_types.go
-make manifests
-operator-sdk create webhook --group torchain --version v1alpha1 --kind TorChain --defaulting --programmatic-validation
+# P.S.
+К назначенной дате не все сделано, так как: 
+1. исследовался механизм запуска wireguard в usermode-режиме  (без прав на создание виртуального интерфейса).
+2. не ясно было как изменять состояние ПОДа при наличии ошибок в работе VPN-приложения.

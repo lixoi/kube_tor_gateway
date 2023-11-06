@@ -1,0 +1,78 @@
+{{- range $client, $params := .Values.annotationsNetwork }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ovpn-route.fullname" $ }}-{{ $client }}
+  namespace: {{ $.Release.Name }}
+  labels:
+    {{- include "ovpn-route.labels" $ | nindent 4 }}
+spec:
+  {{- if not $.Values.autoscaling.enabled }}
+  replicas: {{ $.Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ovpn-route.selectorLabels" $ | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[
+          { 
+            "name": "{{ $params.lan1.name }}", 
+            "interface": "{{ $params.lan1.interface }}", 
+            "ips": ["{{ $params.lan1.ips }}"]
+          },
+	  {
+            "name": "{{ $params.lan2.name }}", 
+            "interface": "{{ $params.lan2.interface }}"
+  	    {{- if $params.lan2.ips }}	
+            ,"ips": ["{{ $params.lan2.ips }}"]
+	    {{- end }}
+          }
+        ]'
+      labels:
+        {{- include "ovpn-route.selectorLabels" $ | nindent 8 }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: {{ $.Values.podVolumes.configDirectory.name }}-{{ $params.chain }}
+          secret:
+            secretName: {{ $.Release.Name }}-secret-{{ $params.chain }}
+        {{- toYaml $.Values.podVolumes.tmpDirectory | nindent 8 }}
+      containers:
+        - name: {{ $.Chart.Name }}-client-{{ $params.chain }}
+          env:
+          - name: GW
+            value: "{{ $params.environments.gatewayAddr }}"
+          - name: CONF
+            value: "/config/client.ovpn"
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: {{ $.Values.podVolumes.configDirectory.name }}-{{ $params.chain }}
+              readOnly: true
+              mountPath: {{ $.Values.podVolumes.configDirectory.mountPath }}
+            - name: tmp
+              mountPath: "/tmp"
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+
