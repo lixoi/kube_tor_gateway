@@ -23,26 +23,29 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type NodeChain struct {
-	// type of chain node: ovpn, wg, socks5
-	TypeNode string `json:"typenode,omitempty"`
-	// metric of bad connects
-	BadConnectsCounter int `json:"badconnectscounter,omitempty"`
-}
-
 // TorChainSpec defines the desired state of TorChain
 // ожидаемое состояние кластера (спецификация)
 type TorChainSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Deployments count
-	// Deployments int    `json:"deployments,omitempty"`
-
-	// length of tor chain
-	LengthChain int `json:"lengthchain,omitempty"`
-	// label of tor gateway
-	LabelChain string `json:"labelchain,omitempty"`
+	// number node of chain
+	NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
+	// typee of VPN node
+	TypeNode string `json:"typeNode,omitempty"` //open_vpn or wireguard
+	// environments:
+	// ip gateway
+	GateWay string `json:"gateway,omitempty"`
+	// file name VPN config
+	VpnFileConfig string `json:"vpnFileConfig,omitempty"`
+	// volumeMounts:
+	// path to TMP dir
+	TmpDir       string `json:"tmpDir,omitempty"`
+	VpnDirConfig string `json:"vpnDirConfig,omitempty"`
+	// image VPN client
+	Image string `json:"image,omitempty"`
+	// nodeSelector
+	NameK8sNode string `json:"nameK8sNode,omitempty"`
 }
 
 // TorChainStatus defines the observed state of TorChain
@@ -54,7 +57,7 @@ type TorChainStatus struct {
 	// All tor nodes are prepared and ready
 	Deployed bool `json:"deployed"`
 	// List of Status Nodes
-	Nodes []*NodeChain `json:"nodechain,omitempty"`
+	//Nodes []*NodeChain `json:"nodechain,omitempty"`
 }
 
 //+kubebuilder:object:root=true

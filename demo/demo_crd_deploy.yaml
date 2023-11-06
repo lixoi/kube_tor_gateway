@@ -1,8 +1,0 @@
-apiVersion: torchain.gate.way/v1alpha1
-kind: TorChain
-metadata:
-  name: demo_chain_gateway
-spec:
-  labelchain: my_chain_gateway
-  lengthchain: 1
-

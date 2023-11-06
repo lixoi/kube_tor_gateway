@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 
+	netattachdef "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,27 +59,65 @@ type TorChainReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	// TODO(user): your logic here
-	chain := &torchainv1alpha1.TorChain{}
-	err := r.Get(ctx, req.NamespacedName, chain)
+
+	multusParams := make([]netattachdef.NetworkAttachmentDefinition, 1, 3)
+	// проверяем инициализацию интерфейсов для цепочки
+	multusInterface := &netattachdef.NetworkAttachmentDefinition{}
+	err := r.Get(ctx, req.NamespacedName, multusInterface)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// цепочка была удалена, удалим развертывание
-			sts := &appsv1.Deployment{}
-			err = r.Get(ctx, types.NamespacedName{Name: chain.Name, Namespace: chain.Namespace}, sts)
-			if err == nil {
-				err = r.Delete(ctx, sts)
-				if err == nil {
-					cm := &corev1.ConfigMap{}
-					err = r.Get(ctx, types.NamespacedName{Name: chain.Name, Namespace: chain.Namespace}, cm)
-				}
-			}
+			// не были заданы интерфейсы, цепрочка не может быть построена
+			return ctrl.Result{}, nil
 		}
-		// и завершаем reconfile успешно (или с ошибкой)
+		// ошибка получения ресурса
+		return ctrl.Result{}, err
+	}
+	multusParams = append(multusParams, *multusInterface)
+	// считываем имена интейрффейсов
+
+	chainNode := &torchainv1alpha1.TorChain{}
+
+	// получаем список узлов цепочки
+	nodesList := &torchainv1alpha1.TorChainList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(chainNode.Namespace),
+		client.MatchingLabels{"instance": chainNode.Name},
+		//client.MatchingFields{"status.phase": "Running"},
+	}
+	if err = r.List(ctx, nodesList, listOpts...); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	if len(nodesList.Items) == 0 {
+		return ctrl.Result{}, nil // если не задан ни один узел цепочки
+	}
+
+	for _, nodeChain := range nodesList.Items {
+		_ = nodeChain
+	}
+
+	err = r.Get(ctx, types.NamespacedName{Name: chainNode.Name, Namespace: chainNode.Namespace}, chainNode)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// узел был удален, удалим развертывание
+			sts := &appsv1.Deployment{}
+			err = r.Get(ctx, types.NamespacedName{Name: chainNode.Name, Namespace: chainNode.Namespace}, sts)
+			if err == nil {
+				err = r.Delete(ctx, sts)
+			}
+		}
+		// ошибка получения ресурса
+		// log.Error(err, "Failed to get HelloApp")
+		return ctrl.Result{}, err
+	}
+
+	// если deployment не был создан
+
 	return ctrl.Result{}, nil
+}
+
+func (r *TorChainReconciler) deployNodeChain() {
+
 }
 
 // SetupWithManager sets up the controller with the Manager.
