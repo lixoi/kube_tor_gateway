@@ -80,11 +80,23 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
+func (r *TorChainReconciler) sniffer(ctx context.Context) error {
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		//client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{"instance": "torgateway"},
+		//client.MatchingFields{"restarts.phase": "1"},
+	}
+	if err := r.List(ctx, podList, listOpts...); err != nil {
+		return err
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *TorChainReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&torchainv1alpha1.TorChain{}).
-		// сущности в RC, которыми будем управлять
+		// сущности в CR, которыми будем управлять
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Secret{}).
 		Complete(r)
