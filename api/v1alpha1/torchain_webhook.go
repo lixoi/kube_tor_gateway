@@ -65,9 +65,9 @@ var _ webhook.Validator = &TorChain{}
 
 func (r *TorChain) validateDeploymens() error {
 	var allErrs field.ErrorList
-	if r.Status.Deployed {
+	if r.Status.Connected {
 		fldPath := field.NewPath("spec").Child("deployments")
-		allErrs = append(allErrs, field.Invalid(fldPath, r.Status.Deployed, "Count of deployments isn't equal length of chain"))
+		allErrs = append(allErrs, field.Invalid(fldPath, r.Status.Connected, "Count of deployments isn't equal length of chain"))
 	}
 
 	if len(allErrs) == 0 {

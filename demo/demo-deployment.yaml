@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-deployment
+  labels:
+    instance: torgateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      instance: torgateway
+  template:
+    metadata:
+      labels:
+        instance: torgateway
+    spec:
+      containers:
+      - name: demo-client
+        image: ping:v0.1

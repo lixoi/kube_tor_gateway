@@ -45,8 +45,14 @@ spec:
               nameK8sNode:
                 description: nodeSelector
                 type: string
+              nameTorChain:
+                description: unigue tor chain name
+                type: string
               numberNode:
                 description: number node of chain
+                type: integer
+              switchServer:
+                description: counter of switched to enother VPN Server
                 type: integer
               tmpDir:
                 description: 'volumeMounts: path to TMP dir'
@@ -64,11 +70,11 @@ spec:
             description: TorChainStatus defines the observed state of TorChain текущее
               состояние кластера
             properties:
-              deployed:
+              connected:
                 description: All tor nodes are prepared and ready
                 type: boolean
             required:
-            - deployed
+            - connected
             type: object
         type: object
     served: true

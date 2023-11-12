@@ -33,6 +33,10 @@ type TorChainSpec struct {
 	NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
 	// typee of VPN node
 	TypeNode string `json:"typeNode,omitempty"` //open_vpn or wireguard
+	// unigue tor chain name
+	NameTorChain string `json:"nameTorChain,omitempty"`
+	// counter of switched to enother VPN Server
+	SwitchServer int `json:"switchServer,omitempty"`
 	// environments:
 	// ip gateway
 	GateWay string `json:"gateway,omitempty"`
@@ -55,9 +59,7 @@ type TorChainStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// All tor nodes are prepared and ready
-	Deployed bool `json:"deployed"`
-	// List of Status Nodes
-	//Nodes []*NodeChain `json:"nodechain,omitempty"`
+	Connected bool `json:"connected"`
 }
 
 //+kubebuilder:object:root=true
