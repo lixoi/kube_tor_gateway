@@ -39,13 +39,18 @@ type TorChainSpec struct {
 	SwitchServer int `json:"switchServer,omitempty"`
 	// environments:
 	// ip gateway
-	GateWay string `json:"gateway,omitempty"`
+	// GateWay string `json:"gateway,omitempty"`
 	// file name VPN config
 	VpnFileConfig string `json:"vpnFileConfig,omitempty"`
 	// volumeMounts:
 	// path to TMP dir
-	TmpDir       string `json:"tmpDir,omitempty"`
-	VpnDirConfig string `json:"vpnDirConfig,omitempty"`
+	TmpDir string `json:"tmpDir,omitempty"`
+	// interfaces:
+	// input traffic
+	InInterface string `json:"inInterface,omitempty"`
+	// output traffic
+	OutInterface string `json:"outInterface,omitempty"`
+	// VpnDirConfig string `json:"vpnDirConfig,omitempty"`
 	// image VPN client
 	Image string `json:"image,omitempty"`
 	// nodeSelector

@@ -14,16 +14,19 @@ spec:
   numberNode: 1 # 2, 3, ...
   typeNode: open_vpn # or wireguard
   nameTorChain: my_tor_gateway
-  # counter of switched to enother VPN Server
-  switchServer: 0 
   # environments
-  gateway: ip_gateway # external ip gateway = 172.10.1.1
+  # gateway: ip_gateway # external ip gateway = 172.10.1.1
   vpnFileConfig: config_file_name
   # volumeMounts
   tmpDir: tmp_directory
-  vpnDirConfig: configuration_directory
+  # interfaces
+  inInterface: br-lan2-conf
+  outInterface: br-extrn-conf
+  # vpnDirConfig: configuration_directory
   # image
   image: image_vpn_client
   # nodeSelector
   nameK8sNode: host_name
+  # counter of switched to enother VPN Server
+  switchServer: 0 
 

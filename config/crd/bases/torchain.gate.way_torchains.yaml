@@ -36,11 +36,12 @@ spec:
             description: TorChainSpec defines the desired state of TorChain ожидаемое
               состояние кластера (спецификация)
             properties:
-              gateway:
-                description: 'environments: ip gateway'
-                type: string
               image:
-                description: image VPN client
+                description: VpnDirConfig string `json:"vpnDirConfig,omitempty"` image
+                  VPN client
+                type: string
+              inInterface:
+                description: 'interfaces: input traffic'
                 type: string
               nameK8sNode:
                 description: nodeSelector
@@ -51,6 +52,9 @@ spec:
               numberNode:
                 description: number node of chain
                 type: integer
+              outInterface:
+                description: output traffic
+                type: string
               switchServer:
                 description: counter of switched to enother VPN Server
                 type: integer
@@ -60,10 +64,9 @@ spec:
               typeNode:
                 description: typee of VPN node
                 type: string
-              vpnDirConfig:
-                type: string
               vpnFileConfig:
-                description: file name VPN config
+                description: 'environments: ip gateway GateWay string `json:"gateway,omitempty"`
+                  file name VPN config'
                 type: string
             type: object
           status:

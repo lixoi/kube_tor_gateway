@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
@@ -39,6 +41,25 @@ import (
 var (
 	controllerLog = ctrl.Log.WithName("controller")
 )
+
+type NetDefinitionConfig struct {
+	Plugins []struct {
+		Type             string
+		Backend          string
+		Bridge           string
+		IsGateway        bool `json:"isGateway"`        //nolint:all
+		IsDefaultGateway bool `json:"isDefaultGateway"` //nolint:all
+		IpMasq           bool `json:"ipMasq"`           //nolint:all
+		Master           string
+		Ipam             struct {
+			Type       string
+			Subnet     string
+			RangeStart string `json:"rangeStart"` //nolint:all
+			RangeEnd   string `json:"rangeEnd"`   //nolint:all
+			Gateway    string
+		}
+	}
+}
 
 // TorChainReconciler reconciles a TorChain object
 type TorChainReconciler struct {
@@ -83,12 +104,12 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// 3. Если доплоймент задан, то меняем конфигурацию (secret) в ПОДе на новую (для нового сервера),
 	//    и меняем статус ПОДа и обновляем deployment
 
-	// 0:
 	node := &torchainv1alpha1.TorChain{}
 	err := r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, node)
+	// 0: (delete)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// узел был удален, удалим развертывание
+			// узел был удален, удалим deployment
 			deploy := &appsv1.Deployment{}
 			err = r.Get(ctx, types.NamespacedName{Name: node.Name, Namespace: node.Namespace}, deploy)
 			if err == nil {
@@ -98,83 +119,86 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, nil
 		}
 		// ошибка получения ресурса
-		// log.Error(err, "Failed to get HelloApp")
 		return ctrl.Result{}, err
 	}
-
 	// 1:
 	deploy := &appsv1.Deployment{}
 	err = r.Get(ctx, types.NamespacedName{Name: node.Name, Namespace: node.Namespace}, deploy)
 	if err != nil {
-		// 2:
+		// 2: (create)
 		if errors.IsNotFound(err) {
-			return ctrl.Result{}, r.createDeployment()
+			return ctrl.Result{}, r.createDeployment(ctx, node)
 		}
 	}
 
 	// 3:
-
-	multusParams := make([]netattachdef.NetworkAttachmentDefinition, 1, 3)
-	// проверяем инициализацию интерфейсов для цепочки
-	multusInterface := &netattachdef.NetworkAttachmentDefinition{}
-	err = r.Get(ctx, req.NamespacedName, multusInterface)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// не были заданы интерфейсы, цепрочка не может быть построена
-			return ctrl.Result{}, nil
-		}
-		// ошибка получения ресурса
-		return ctrl.Result{}, nil
-	}
-	multusParams = append(multusParams, *multusInterface)
-	// считываем имена интейрффейсов
-
-	chainNode := &torchainv1alpha1.TorChain{}
-
-	// получаем список узлов цепочки
-	nodesList := &torchainv1alpha1.TorChainList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(chainNode.Namespace),
-		client.MatchingLabels{"instance": chainNode.Name},
-		//client.MatchingFields{"status.phase": "Running"},
-	}
-	if err = r.List(ctx, nodesList, listOpts...); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if len(nodesList.Items) == 0 {
-		return ctrl.Result{}, nil // если не задан ни один узел цепочки
-	}
-
-	for _, nodeChain := range nodesList.Items {
-		_ = nodeChain
-	}
-
-	err = r.Get(ctx, types.NamespacedName{Name: chainNode.Name, Namespace: chainNode.Namespace}, chainNode)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// узел был удален, удалим развертывание
-			sts := &appsv1.Deployment{}
-			err = r.Get(ctx, types.NamespacedName{Name: chainNode.Name, Namespace: chainNode.Namespace}, sts)
-			if err == nil {
-				err = r.Delete(ctx, sts)
-			}
-		}
-		// ошибка получения ресурса
-		// log.Error(err, "Failed to get HelloApp")
-
-		return ctrl.Result{}, err
-	}
-
-	// если deployment не был создан
+	secret := &corev1.Secret{}
+	err = r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, secret)
 
 	return ctrl.Result{}, nil
 }
 
-func (r *TorChainReconciler) createDeployment() error {
+func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchainv1alpha1.TorChain) error {
 	// 2.1
+	inNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.InInterface)
+	if err != nil {
+		return err
+	}
+	outNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.OutInterface)
+	if err != nil {
+		return err
+	}
+	_ = inNetConf
+	_ = outNetConf
+	// 2.3 (create  deployment with sidecar)
+	// 2.3.1 create secret
+	secret, err := createSecret(ctx, node)
+	if err != nil {
+		return err
+	}
+	err = r.Create(ctx, secret)
 
-	return nil
+	return err
+}
+
+func (r *TorChainReconciler) getNetworkDefinition(ctx context.Context, nameSpace, name string) (*NetDefinitionConfig, error) {
+	interfaceDef := &netattachdef.NetworkAttachmentDefinition{}
+	err := r.Get(ctx, types.NamespacedName{Namespace: nameSpace, Name: name}, interfaceDef)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// 2.2
+			return nil, err // не были заданы интерфейсы, цепрочка не может быть построена
+		}
+		return nil, err // ошибка получения ресурса
+	}
+	netConfig := &NetDefinitionConfig{}
+	err = json.Unmarshal([]byte(interfaceDef.Spec.Config), netConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return netConfig, nil
+}
+
+func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1.Secret, error) {
+	vpnConfig := make(map[string]string)
+	vpnConfig[node.Spec.VpnFileConfig] = "get secret from Vault"
+	// get secret from vault
+	newSecret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: node.Namespace,
+			Name:      node.Name,
+		},
+		Type:       corev1.SecretTypeOpaque,
+		Data:       map[string][]byte{},
+		StringData: vpnConfig,
+	}
+
+	return newSecret, nil
 }
 
 // обход по списку для запуска потока поиска недоступного узла (updateNodeTorChain):
