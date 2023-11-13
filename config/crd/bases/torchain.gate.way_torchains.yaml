@@ -36,12 +36,29 @@ spec:
             description: TorChainSpec defines the desired state of TorChain ожидаемое
               состояние кластера (спецификация)
             properties:
-              labelchain:
-                description: label of tor gateway
+              gateway:
+                description: 'environments: ip gateway'
                 type: string
-              lengthchain:
-                description: length of tor chain
+              image:
+                description: image VPN client
+                type: string
+              nameK8sNode:
+                description: nodeSelector
+                type: string
+              numberNode:
+                description: number node of chain
                 type: integer
+              tmpDir:
+                description: 'volumeMounts: path to TMP dir'
+                type: string
+              typeNode:
+                description: typee of VPN node
+                type: string
+              vpnDirConfig:
+                type: string
+              vpnFileConfig:
+                description: file name VPN config
+                type: string
             type: object
           status:
             description: TorChainStatus defines the observed state of TorChain текущее
@@ -50,18 +67,6 @@ spec:
               deployed:
                 description: All tor nodes are prepared and ready
                 type: boolean
-              nodechain:
-                description: List of Status Nodes
-                items:
-                  properties:
-                    badconnectscounter:
-                      description: metric of bad connects
-                      type: integer
-                    typenode:
-                      description: 'type of chain node: ovpn, wg, socks5'
-                      type: string
-                  type: object
-                type: array
             required:
             - deployed
             type: object

@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strconv"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,12 +69,7 @@ func (r *TorChain) validateDeploymens() error {
 		fldPath := field.NewPath("spec").Child("deployments")
 		allErrs = append(allErrs, field.Invalid(fldPath, r.Status.Deployed, "Count of deployments isn't equal length of chain"))
 	}
-	for i, v := range r.Status.Nodes {
-		if v.BadConnectsCounter > 10 {
-			fldPath := field.NewPath("status").Child("BadConnectsCounter")
-			allErrs = append(allErrs, field.Invalid(fldPath, strconv.Itoa(i), "Node of chain is bad connect"))
-		}
-	}
+
 	if len(allErrs) == 0 {
 		return nil
 	}

@@ -57,6 +57,10 @@ type TorChainReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+
+	//
+	r.sniffer(ctx)
+	//
 	// TODO(user): your logic here
 	chain := &torchainv1alpha1.TorChain{}
 	err := r.Get(ctx, req.NamespacedName, chain)
@@ -90,6 +94,8 @@ func (r *TorChainReconciler) sniffer(ctx context.Context) error {
 	if err := r.List(ctx, podList, listOpts...); err != nil {
 		return err
 	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
