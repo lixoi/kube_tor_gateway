@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
@@ -59,6 +60,12 @@ type NetDefinitionConfig struct {
 			Gateway    string
 		}
 	}
+}
+
+type NetDeploymentAnnotation struct {
+	Name      string   `json:"name"`
+	Interface string   `json:"interface"`
+	Ips       []string `json:"ips"`
 }
 
 // TorChainReconciler reconciles a TorChain object
@@ -144,12 +151,29 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 	if err != nil {
 		return err
 	}
+	inDeployAnnotation := &NetDeploymentAnnotation{
+		Name:      node.Spec.InInterface,
+		Interface: inNetConf.Plugins[0].Bridge,
+	}
+	inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, inNetConf.Plugins[0].Ipam.RangeStart)
+	jsonInNetAnnotation, err := json.Marshal(inDeployAnnotation)
+	if err != nil {
+		return err
+	}
+
 	outNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.OutInterface)
 	if err != nil {
 		return err
 	}
-	_ = inNetConf
-	_ = outNetConf
+	outDeployAnnotation := &NetDeploymentAnnotation{
+		Name:      node.Spec.InInterface,
+		Interface: outNetConf.Plugins[0].Bridge,
+	}
+	outDeployAnnotation.Ips = append(inDeployAnnotation.Ips, inNetConf.Plugins[0].Ipam.RangeStart)
+	jsonOutNetAnnotation, err := json.Marshal(outDeployAnnotation)
+	if err != nil {
+		return err
+	}
 	// 2.3 (create  deployment with sidecar)
 	// 2.3.1 create secret
 	secret, err := createSecret(ctx, node)
@@ -157,6 +181,29 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 		return err
 	}
 	err = r.Create(ctx, secret)
+	// 2.3.2 create deployment
+	var replicas int32 = 1
+	dpl := appsv1.Deployment{
+		ObjectMeta: ctrl.ObjectMeta{
+			Namespace: node.Namespace,
+			Name:      node.Name,
+			Labels:    map[string]string{"instance": "torgateway"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &v1.LabelSelector{
+				MatchLabels: map[string]string{"instance": "torgateway"},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: ctrl.ObjectMeta{
+					Annotations: map[string]string{netattachdef.NetworkAttachmentAnnot: "[" + string(jsonInNetAnnotation) + "," + string(jsonOutNetAnnotation) + "]"},
+					Labels:      map[string]string{"instance": "torgateway"},
+				},
+			},
+		},
+	}
+
+	_ = dpl
 
 	return err
 }
