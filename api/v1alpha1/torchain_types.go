@@ -29,6 +29,8 @@ type TorChainSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	//drop of vpn chain
+	DropVPNChain int `json:"drop,omitempty"`
 	// number node of chain
 	NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
 	// typee of VPN node
@@ -48,6 +50,7 @@ type TorChainSpec struct {
 	// interfaces:
 	// input traffic
 	InInterface string `json:"inInterface,omitempty"`
+	IPGateWay   string `json:"ipGateWay,omitempty"`
 	// output traffic
 	OutInterface string `json:"outInterface,omitempty"`
 	// VpnDirConfig string `json:"vpnDirConfig,omitempty"`

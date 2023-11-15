@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"sync"
 	"time"
 
@@ -145,6 +146,7 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchainv1alpha1.TorChain) error {
 	// 2.1
+	// инициализация входного интерфейса
 	inNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.InInterface)
 	if err != nil {
 		return err
@@ -153,12 +155,22 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 		Name:      node.Spec.InInterface,
 		Interface: inNetConf.Plugins[0].Bridge,
 	}
-	inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, inNetConf.Plugins[0].Ipam.RangeStart)
+	// если входной узел цепочки 
+	if node.Spec.NumberNode == node.Spec.DropVPNChain {
+		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, node.Spec.IPGateWay)
+	} else {
+		if len(inNetConf.Plugins) == 0 {
+			return errors.NewInvalid("Invalid config MetworkDefinition")
+		}
+		ipNode := net.ParseIP(inNetConf.Plugins[0].Ipam.RangeStart)
+		ipNode[len(ipNode)] += 2
+		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, ipNode.String())
+	}
 	jsonInNetAnnotation, err := json.Marshal(inDeployAnnotation)
 	if err != nil {
 		return err
 	}
-
+	// инициализация выходного интерфейса
 	outNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.OutInterface)
 	if err != nil {
 		return err
@@ -167,11 +179,24 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 		Name:      node.Spec.InInterface,
 		Interface: outNetConf.Plugins[0].Bridge,
 	}
-	outDeployAnnotation.Ips = append(inDeployAnnotation.Ips, inNetConf.Plugins[0].Ipam.RangeStart)
+	var gw string
+	// если выходной узел цепочки 
+	if node.Spec.NumberNode == 1 {
+		gw = outNetConf.
+		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, node.Spec.IPGateWay)
+	} else {
+		if len(inNetConf.Plugins) == 0 {
+			return errors.NewInvalid("Invalid config MetworkDefinition")
+		}
+		ipNode := net.ParseIP(inNetConf.Plugins[0].Ipam.RangeStart)
+		ipNode[len(ipNode)] += 2
+		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, ipNode.String())
+	}
 	jsonOutNetAnnotation, err := json.Marshal(outDeployAnnotation)
 	if err != nil {
 		return err
 	}
+
 	// 2.3 (create  deployment with sidecar)
 	// 2.3.1 create secret
 	secret, err := createSecret(ctx, node)
@@ -224,6 +249,8 @@ func (r *TorChainReconciler) getNetworkDefinition(ctx context.Context, nameSpace
 
 	return netConfig, nil
 }
+
+func 
 
 func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1.Secret, error) {
 	vpnConfig := make(map[string]string)
