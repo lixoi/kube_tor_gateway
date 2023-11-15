@@ -44,20 +44,28 @@ var (
 )
 
 type NetDefinitionConfig struct {
-	Plugins []struct {
-		Type             string
-		Backend          string
-		Bridge           string
-		IsGateway        bool `json:"isGateway"`        //nolint:all
-		IsDefaultGateway bool `json:"isDefaultGateway"` //nolint:all
-		IpMasq           bool `json:"ipMasq"`           //nolint:all
-		Master           string
-		Ipam             struct {
-			Type       string
-			Subnet     string
-			RangeStart string `json:"rangeStart"` //nolint:all
-			RangeEnd   string `json:"rangeEnd"`   //nolint:all
-			Gateway    string
+	CniVersion string `json:"cniVersion"` //nolint:all
+	Plugins    []NetDefinitionParams
+	NetDefinitionParams
+}
+
+type NetDefinitionParams struct {
+	Type             string
+	Backend          string
+	Bridge           string
+	IsGateway        bool `json:"isGateway"`        //nolint:all
+	IsDefaultGateway bool `json:"isDefaultGateway"` //nolint:all
+	IpMasq           bool `json:"ipMasq"`           //nolint:all
+	Master           string
+	Mode             string
+	Ipam             struct {
+		Type       string
+		Subnet     string
+		RangeStart string `json:"rangeStart"` //nolint:all
+		RangeEnd   string `json:"rangeEnd"`   //nolint:all
+		GateWay    string `json:"gateway"`    //nolint:all
+		Routes     []struct {
+			Dst string
 		}
 	}
 }
@@ -145,58 +153,69 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchainv1alpha1.TorChain) error {
+	var (
+		interfaceName string
+		gw            string
+	)
 	// 2.1
-	// инициализация входного интерфейса
+	// ---------------------------------- инициализация входного интерфейса ----------------------------------
 	inNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.InInterface)
 	if err != nil {
 		return err
 	}
+	inNetParams := NetDefinitionParams{}
+	if len(inNetConf.Plugins) != 0 { // if init bridge adapter
+		inNetParams = inNetConf.Plugins[0]
+		interfaceName = inNetConf.Bridge
+	} else { // else init macvlan adapter
+		interfaceName = inNetConf.Master
+	}
 	inDeployAnnotation := &NetDeploymentAnnotation{
 		Name:      node.Spec.InInterface,
-		Interface: inNetConf.Plugins[0].Bridge,
+		Interface: interfaceName,
 	}
-	// если входной узел цепочки 
+	// если входной узел цепочки
 	if node.Spec.NumberNode == node.Spec.DropVPNChain {
 		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, node.Spec.IPGateWay)
 	} else {
-		if len(inNetConf.Plugins) == 0 {
-			return errors.NewInvalid("Invalid config MetworkDefinition")
-		}
-		ipNode := net.ParseIP(inNetConf.Plugins[0].Ipam.RangeStart)
-		ipNode[len(ipNode)] += 2
+		ipNode := net.ParseIP(inNetParams.Ipam.RangeStart)
+		ipNode[len(ipNode)-1] += 2
 		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, ipNode.String())
 	}
 	jsonInNetAnnotation, err := json.Marshal(inDeployAnnotation)
 	if err != nil {
 		return err
 	}
-	// инициализация выходного интерфейса
+	// ---------------------------------- инициализация выходного интерфейса ----------------------------------
 	outNetConf, err := r.getNetworkDefinition(ctx, node.Namespace, node.Spec.OutInterface)
 	if err != nil {
 		return err
 	}
+	outNetParams := NetDefinitionParams{}
+	if len(outNetConf.Plugins) != 0 { // if init bridge adapter
+		outNetParams = outNetConf.Plugins[0]
+		interfaceName = outNetConf.Bridge
+	} else { // else init macvlan adapter
+		interfaceName = outNetConf.Master
+	}
 	outDeployAnnotation := &NetDeploymentAnnotation{
 		Name:      node.Spec.InInterface,
-		Interface: outNetConf.Plugins[0].Bridge,
+		Interface: interfaceName,
 	}
-	var gw string
-	// если выходной узел цепочки 
+	ipNode := net.ParseIP(outNetParams.Ipam.RangeStart)
+	ipNode[len(ipNode)-1] += 1
+	outDeployAnnotation.Ips = append(outDeployAnnotation.Ips, ipNode.String())
+	// если выходной узел цепочки
 	if node.Spec.NumberNode == 1 {
-		gw = outNetConf.
-		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, node.Spec.IPGateWay)
+		gw = outNetParams.Ipam.GateWay
 	} else {
-		if len(inNetConf.Plugins) == 0 {
-			return errors.NewInvalid("Invalid config MetworkDefinition")
-		}
-		ipNode := net.ParseIP(inNetConf.Plugins[0].Ipam.RangeStart)
-		ipNode[len(ipNode)] += 2
-		inDeployAnnotation.Ips = append(inDeployAnnotation.Ips, ipNode.String())
+		ipNode[len(ipNode)-1] += 1
+		gw = ipNode.String()
 	}
 	jsonOutNetAnnotation, err := json.Marshal(outDeployAnnotation)
 	if err != nil {
 		return err
 	}
-
 	// 2.3 (create  deployment with sidecar)
 	// 2.3.1 create secret
 	secret, err := createSecret(ctx, node)
@@ -204,9 +223,12 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 		return err
 	}
 	err = r.Create(ctx, secret)
+	if err != nil {
+		return err
+	}
 	// 2.3.2 create deployment
 	var replicas int32 = 1
-	dpl := appsv1.Deployment{
+	dpl := &appsv1.Deployment{
 		ObjectMeta: ctrl.ObjectMeta{
 			Namespace: node.Namespace,
 			Name:      node.Name,
@@ -222,13 +244,73 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 					Annotations: map[string]string{netattachdef.NetworkAttachmentAnnot: "[" + string(jsonInNetAnnotation) + "," + string(jsonOutNetAnnotation) + "]"},
 					Labels:      map[string]string{"instance": "torgateway"},
 				},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: node.Name + "-sec",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: node.Name,
+								},
+							},
+						},
+						{
+							Name: node.Name + "-tmp",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:            node.Name,
+							Image:           node.Spec.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Resources:       corev1.ResourceRequirements{},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "GW",
+									Value: gw,
+								},
+								{
+									Name:  "CONF",
+									Value: "/config/client.vpn",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      node.Name + "-sec",
+									MountPath: "/config",
+								},
+								{
+									Name:      node.Name + "-tmp",
+									MountPath: "/tmp",
+								},
+							},
+						},
+						{
+							Name:  "sidecar-healthcheck",
+							Image: "busybox",
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"wget", "-T2", "-O-", "ya.ru"},
+									},
+								},
+								InitialDelaySeconds: 10,
+								PeriodSeconds:       5,
+								TimeoutSeconds:      2,
+								FailureThreshold:    2,
+							},
+						},
+					},
+					NodeSelector: map[string]string{corev1.LabelHostname: node.Spec.NameK8sNode},
+				},
 			},
 		},
 	}
 
-	_ = dpl
-
-	return err
+	return r.Create(ctx, dpl)
 }
 
 func (r *TorChainReconciler) getNetworkDefinition(ctx context.Context, nameSpace, name string) (*NetDefinitionConfig, error) {
@@ -249,8 +331,6 @@ func (r *TorChainReconciler) getNetworkDefinition(ctx context.Context, nameSpace
 
 	return netConfig, nil
 }
-
-func 
 
 func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1.Secret, error) {
 	vpnConfig := make(map[string]string)

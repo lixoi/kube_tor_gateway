@@ -36,12 +36,17 @@ spec:
             description: TorChainSpec defines the desired state of TorChain ожидаемое
               состояние кластера (спецификация)
             properties:
+              drop:
+                description: drop of vpn chain
+                type: integer
               image:
                 description: VpnDirConfig string `json:"vpnDirConfig,omitempty"` image
                   VPN client
                 type: string
               inInterface:
                 description: 'interfaces: input traffic'
+                type: string
+              ipGateWay:
                 type: string
               nameK8sNode:
                 description: nodeSelector
