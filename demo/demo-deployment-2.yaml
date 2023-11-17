@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-deployment
+  labels:
+    instance: torgateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      instance: torgateway
+  template:
+    metadata:
+      labels:
+        instance: torgateway
+    spec:
+      containers:
+      - name: demo-client-pod
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        resources: {}
+        volumeMounts:
+          - name: var-logs
+            mountPath: /tmp
+        args:
+          - /bin/sh
+          - -c
+          - touch /tmp/healthy; sleep 60; rm -f /tmp/healthy; sleep 600
+      - name: sidecar-container
+        image: busybox
+        args:
+          - /bin/sh
+          - -c
+          - touch /tmp/healthy2; sleep 60; rm -f /tmp/healthy2; sleep 600
+        volumeMounts:
+          - name: var-logs
+            mountPath: /tmp
+        livenessProbe:
+          exec:
+            command:
+              - cat
+              - /tmp/healthy2
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 2
+      volumes:
+      - name: var-logs
+        emptyDir: {}
+
