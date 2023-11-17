@@ -15,5 +15,15 @@ spec:
         instance: torgateway
     spec:
       containers:
-      - name: demo-client
-        image: ping:v0.1
+      - name: demo-client-pod
+        image: demo-client
+        imagePullPolicy: IfNotPresent
+      - name: sidecar-container
+        image: busybox
+        livenessProbe:
+          exec:
+            command: ["wget", "-T2", "-O-", "ya.ru"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 2
+

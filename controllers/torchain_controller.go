@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -287,9 +288,12 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 									MountPath: "/tmp",
 								},
 							},
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
+							},
 						},
 						{
-							Name:  "sidecar-healthcheck",
+							Name:  node.Name + "sidecar-healthcheck",
 							Image: "busybox",
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
@@ -374,6 +378,17 @@ func (r *TorChainReconciler) snifferTorChains(ctx context.Context) error {
 			isInitialized := false
 			controllerLog.Info("func snifferTorChains: range pods")
 			// break
+			for _, podContainer := range pod.Status.ContainerStatuses {
+				if !strings.HasSuffix(podContainer.Name, "sidecar-healthcheck") {
+					continue
+				}
+				if podContainer.LastTerminationState.Terminated != nil && podContainer.LastTerminationState.Terminated.Reason == "Error" {
+					nameSpaces = append(nameSpaces, pod.Namespace)
+					r.wg.Add(1)
+					go r.updateNodeTorChain(ctx, pod.Namespace)
+				}
+
+			}
 			for _, podCondition := range pod.Status.Conditions {
 				switch podCondition.Type {
 				case "Initialized":
@@ -381,14 +396,14 @@ func (r *TorChainReconciler) snifferTorChains(ctx context.Context) error {
 						isInitialized = true
 					}
 				case "Ready":
-					nameSpace := pod.GetNamespace()
-					if podCondition.Status == "False" && isInitialized == true && !slices.Contains(nameSpaces, nameSpace) {
-						nameSpaces = append(nameSpaces, nameSpace)
+					if podCondition.Status == "False" && isInitialized == true && !slices.Contains(nameSpaces, pod.Namespace) {
+						nameSpaces = append(nameSpaces, pod.Namespace)
 						r.wg.Add(1)
-						go r.updateNodeTorChain(ctx, nameSpace)
+						go r.updateNodeTorChain(ctx, pod.Namespace)
 					}
 				}
 			}
+
 		}
 		r.wg.Wait()
 
