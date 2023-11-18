@@ -1,5 +1,3 @@
-#pkgs ? import <nixpkgs> { system = "x86_64-linux"};
-#with import <nixpkgs> {}; 
 {name ? "tor-chain/ovpn-client", tag ? "v1" }:
 let 
 	system = "x86_64-linux";
@@ -36,8 +34,6 @@ exec openvpn --config $CONF
 		];
    		Cmd = [
 			entrypoint
-			#"${pkgs.bash}/bin/sh" "/configure/init.sh"
-			#"${pkgs.bash}/bin/sh" "-c" "echo hello > foo; ls -l"
 		];
 		Entrypoint = [ entrypoint ];
  	};

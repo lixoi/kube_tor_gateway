@@ -1,5 +1,3 @@
-#pkgs ? import <nixpkgs> { system = "x86_64-linux"};
-#with import <nixpkgs> {}; 
 {name ? "tor-chain/wg-client", tag ? "latest" }:
 let 
 	system = "x86_64-linux";
@@ -27,21 +25,12 @@ coproc { exec >&-; read; }; eval exec "$VAL<&-"; wait
   pkgs.dockerTools.buildImage {
 	inherit name tag;
 	contents = [
-		#pkgs.busybox
 		pkgs.bash
 		pkgs.wireguard 
 		pkgs.iproute2
 		pkgs.iptables
-		#entrypoint
 	];
 
-	#runAsRoot = ''
-		#!${pkgs.runtimeShell}		
-		#iptables -t nat -A POSTROUTING -o wg0 -j MASQUERADE
-	#'';
-	#extraCommands = ''
-	#	mkdir /mydir/my
-	#'';
 	config = {
 		WorkingDir = "/config";
 		#Tag = "latest";
@@ -49,8 +38,6 @@ coproc { exec >&-; read; }; eval exec "$VAL<&-"; wait
 		];
    		Cmd = [
 			entrypoint
-			#"${pkgs.bash}/bin/sh" "/configure/init.sh"
-			#"${pkgs.bash}/bin/sh" "-c" "echo hello > foo; ls -l"
 		];
 		Entrypoint = [ entrypoint ];
  	};
