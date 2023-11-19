@@ -23,42 +23,46 @@ VPN-клиенты логируют сообщения в stdout.
 
 # Этапы работ: 
 
-На первом этапе проводились тестовые испытания, была развернута цепочка client1-client2-client3-server3-server2-server1 через docker-compose (в проекте не представлено).
+На первом этапе проводились тестовые испытания: была развернута цепочка client1-client2-client3-server3-server2-server1 через docker-compose (в проекте не представлено).
+
 На втором была поднята K8s через kubeadm (папка K8s). Облачные провайдеры не подходят из-за использования CNI Multus и необходимости знания топологии физической сети кластера.
-На третем разработан helm chart (папка Helm/ovpn-route) развертывания цепочки, состоящей из 3-х OpenVPN узлов.
+
+На третем - разработан helm chart (папка Helm/ovpn-route) развертывания цепочки, состоящей из 3-х OpenVPN узлов.
 
 На четвертом этапе разработан оператор, который создает узлы цепочки в соответствии с заданной в chart-е концигурацией и отслеживает состояяние доступности внешних узлов.
+
 На текущем этапе - интеграция с ELK и Vault.
 
 # HELM Chart
 
 Необходимость Chart-а обусловлена описанием концигурации сетевых интерфейсов клиентских узлов цепочки в соответствии с конфигурацией физической сети кластера, а также заданием параметров каждого узла цепочки на основе CRD TorChain:
-type TorChainSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
-	//drop of vpn chain
-	DropVPNChain int `json:"drop,omitempty"`
-	// number node of chain
-	NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
-	// counter of switched to enother VPN Server
-	SwitchServer int `json:"switchServer,omitempty"`
-	// environments:
-	// ip gateway
-	IPGateWay string `json:"ipGateWay,omitempty"`
-	// volumeMounts:
-	// file name VPN config
-	VpnFileConfig string `json:"vpnFileConfig,omitempty"`
-	// interfaces:
-	// input traffic
-	InInterface string `json:"inInterface,omitempty"`
-	// output traffic
-	OutInterface string `json:"outInterface,omitempty"`
-	// image VPN client
-	Image string `json:"image,omitempty"`
-	// nodeSelector
-	NameK8sNode string `json:"nameK8sNode,omitempty"`
-}
+    type TorChainSpec struct {
+        // INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+        // Important: Run "make" to regenerate code after modifying this file
+
+        //drop of vpn chain
+        DropVPNChain int `json:"drop,omitempty"`
+        // number node of chain
+        NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
+        // counter of switched to enother VPN Server
+        SwitchServer int `json:"switchServer,omitempty"`
+        // environments:
+        // ip gateway
+        IPGateWay string `json:"ipGateWay,omitempty"`
+        // volumeMounts:
+        // file name VPN config
+        VpnFileConfig string `json:"vpnFileConfig,omitempty"`
+        // interfaces:
+        // input traffic
+        InInterface string `json:"inInterface,omitempty"`
+        // output traffic
+        OutInterface string `json:"outInterface,omitempty"`
+        // image VPN client
+        Image string `json:"image,omitempty"`
+        // nodeSelector
+        NameK8sNode string `json:"nameK8sNode,omitempty"`
+    }
 
 В примере описывается (по мнению автора) оптимальная конфигурация:
 1. Все узлы цепочки запускаются на определенной НОДе кластера (через NodeSelector)
@@ -68,24 +72,32 @@ type TorChainSpec struct {
 
 # Алгоритм работы оператора
 
-Целью разработки оператора было поддержание в автоматизированном режиме рабочей vpn-цепочки при наличии пула внешних VPN-серверов c конфигурационными файлами доступа в (защищенном) хранилище (пр. Vault). Таким образом, при недоступности внешнего сервера какого-либо узла цепочки, оператор должен взять из хранилища конфигурационные данные доступа к новому серверу, перезаписать данные и перезапустить узел. 
+Целью разработки оператора было поддержание в автоматизированном режиме рабочей VPN-цепочки при наличии пула внешних VPN-серверов c конфигурационными файлами доступа в (защищенном) хранилище (пр. Vault). Таким образом, при недоступности внешнего сервера какого-либо узла цепочки, оператор должен взять из хранилища конфигурационные данные доступа к новому серверу, перезаписать данные и перезапустить узел. 
 Для решения задачи генарации события update (или patch) основной функции Reconcile оператора при недоступности сервера узла цепочки бало найдено два способа:
-1. Направлять логи ошибок vpn-клиентов в prometheus, строить метрики (например, количество ошибок подключения к vpn-серверу) и через prometheus-adapter изменять значение в спецификации манифеста узла цепочки в базе etcd.
+1. Направлять логи ошибок VPN-клиентов в Prometheus, строить метрики (например, количество ошибок подключения к VPN-серверу) и через prometheus-adapter изменять значение в спецификации манифеста узла цепочки в базе etcd.
 2. В операторе создать отдельный поток, который через заданный интервал времени получает состояние узлов цепочек и при изменении состояния изменяет значение в спецификации манифеста узла цепочки в базе etcd.  
+
 Был выбран второй способ. 
+
 Алгоритм:
 1. При первом запуске Reconcile создается горутина сканирования узлов всех цепочек (функция snifferTorChains)
-2. При создании CRD TorChain оператор создает secret и Deployment (функция createDeployment), в котором задан базовый контейнер VPN-клиента и sidecar-контейнер с livenessProbe проверки доступности vpn-сервера.
+2. При создании CRD TorChain оператор создает secret и Deployment (функция createDeployment), в котором задан базовый контейнер VPN-клиента и sidecar-контейнер с livenessProbe проверки доступности VPN-сервера.
 3. Функция snifferTorChains:
-    - Определяет в каком NameSpace есть ПОД со статусом false
+    - Определяет в каком NameSpace есть ПОД со статусом false.
     - Так как 'вехний' по вложенности ПОД, в случае недоступности сервера, будет блокировать трафик всем ПОДам уровней 'ниже', в найденном NameSpace функция находит самый 'верхний' (наименьший по нумерации) ПОД со статусом false. 
     - Для найденного ПОДа изменяется значение SwitchServer в спецификации и обновляется манифест (для инициализации события update). 
-   При такой реализации будет происходить последовательное восстановление связи от 'верхнего' узла цепочки к 'нижнему' (по вложенности). 
-   Таймаут итерации сканирования в snifferTorChains больше, чем PeriodSeconds+TimeoutSeconds в LivenessProbe. Это условие позволяет гарантировать, что snifferTorChains не обновит спецификацию манифеста прежде, чем не отработает LivenessProbe после предыдущего обновления.
+   
+При такой реализации будет происходить последовательное восстановление связи от 'верхнего' узла цепочки к 'нижнему' (по вложенности). 
+   
+Таймаут итерации сканирования в snifferTorChains больше, чем PeriodSeconds+TimeoutSeconds в LivenessProbe. Это условие позволяет гарантировать, что snifferTorChains не обновит спецификацию манифеста прежде, чем не отработает LivenessProbe после предыдущего обновления.
 
-# Сборка образа при помощи пакетного менеджера nixpkgs
+# Сборка образа при помощи пакетного менеджера nix (nixpkgs)
 
+nixpkgs - пакетный менеджер, построенный вокруг идеи декларативного описания конфигурации (или состояния) приложения или системы (NixOS).
 
+Nix размещает все установленные пакеты в собственных подкаталогах внутри каталога /nix/store. К примеру, установленный пакет Git будет располагаться в каталоге /nix/store/nawl092prjblbhvv16kxxbk6j9gkgcqm-git-2.14.1, где набор цифр — это хеш, образованный от окружения сборки пакета: файлов исходников, дерева зависимостей, флагов компилятора и другого. Поэтому с помощью Nix можно установить одновременно не только две версии одного приложения, но и даже две разные сборки.
+
+При указании в декларации описания конфигурации пакета docker-образ (pkgs.dockerTools.buildImage {}), в результате сборки (nix-build default.nix) получится архив, скомпанованный в формате OCI (см. https://nix.dev/tutorials/nixos/building-and-running-docker-images.html).
 
 
 # tor-operator
