@@ -45,15 +45,6 @@ var _ webhook.Defaulter = &TorChain{}
 func (r *TorChain) Default() {
 	torchainlog.Info("default", "name", r.Name)
 
-	// init sidecar-container in all Nodes
-	/*
-		podList := &corev1.PodList{}
-		opts := []client.ListOption{
-			client.InNamespace(r.Namespace),
-			client.MatchingLabels{"instance": request.NamespacedName.Name},
-			client.MatchingFields{"status.phase": "Running"},
-		}
-	*/
 	// TODO(user): fill in your defaulting logic.
 
 }

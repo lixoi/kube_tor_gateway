@@ -40,19 +40,16 @@ spec:
                 description: drop of vpn chain
                 type: integer
               image:
-                description: VpnDirConfig string `json:"vpnDirConfig,omitempty"` image
-                  VPN client
+                description: image VPN client
                 type: string
               inInterface:
                 description: 'interfaces: input traffic'
                 type: string
               ipGateWay:
+                description: 'environments: ip gateway'
                 type: string
               nameK8sNode:
                 description: nodeSelector
-                type: string
-              nameTorChain:
-                description: unigue tor chain name
                 type: string
               numberNode:
                 description: number node of chain
@@ -63,15 +60,8 @@ spec:
               switchServer:
                 description: counter of switched to enother VPN Server
                 type: integer
-              tmpDir:
-                description: 'volumeMounts: path to TMP dir'
-                type: string
-              typeNode:
-                description: typee of VPN node
-                type: string
               vpnFileConfig:
-                description: 'environments: ip gateway GateWay string `json:"gateway,omitempty"`
-                  file name VPN config'
+                description: 'volumeMounts: file name VPN config'
                 type: string
             type: object
           status:

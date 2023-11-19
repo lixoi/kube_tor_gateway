@@ -33,27 +33,19 @@ type TorChainSpec struct {
 	DropVPNChain int `json:"drop,omitempty"`
 	// number node of chain
 	NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
-	// typee of VPN node
-	TypeNode string `json:"typeNode,omitempty"` //open_vpn or wireguard
-	// unigue tor chain name
-	NameTorChain string `json:"nameTorChain,omitempty"`
 	// counter of switched to enother VPN Server
 	SwitchServer int `json:"switchServer,omitempty"`
 	// environments:
 	// ip gateway
-	// GateWay string `json:"gateway,omitempty"`
+	IPGateWay string `json:"ipGateWay,omitempty"`
+	// volumeMounts:
 	// file name VPN config
 	VpnFileConfig string `json:"vpnFileConfig,omitempty"`
-	// volumeMounts:
-	// path to TMP dir
-	TmpDir string `json:"tmpDir,omitempty"`
 	// interfaces:
 	// input traffic
 	InInterface string `json:"inInterface,omitempty"`
-	IPGateWay   string `json:"ipGateWay,omitempty"`
 	// output traffic
 	OutInterface string `json:"outInterface,omitempty"`
-	// VpnDirConfig string `json:"vpnDirConfig,omitempty"`
 	// image VPN client
 	Image string `json:"image,omitempty"`
 	// nodeSelector

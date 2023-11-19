@@ -1,0 +1,29 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: br-lan1-conf
+  namespace: {{ .Release.Name }}
+spec:
+  config: '{
+      "cniVersion": "0.4.0",
+      "plugins": [
+        {
+          "type": "bridge",
+          "bridge": "lanbr1",
+          "isGateway": true,
+          "isDefaultGateway": true,
+          "master": "lo",
+          "ipam": {
+            "type": "host-local",
+            "subnet": "192.168.1.0/24",
+            "rangeStart": "192.168.1.2",
+            "rangeEnd": "192.168.1.5",
+            "gateway": "192.168.1.1"
+          }
+        },
+        {
+          "type": "firewall",
+          "backend": "iptables"
+        }
+      ]
+    }'

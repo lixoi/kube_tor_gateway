@@ -1,0 +1,25 @@
+{- range $client, $params := .Values.annotationsNetwork }}
+---
+apiVersion: torchain.gate.way/v1alpha1
+kind: TorChain
+metadata:
+  name: {{ include "ovpn-route.fullname" $ }}-{{ $client }}
+  namespace: {{ $.Release.Name }}
+  labels:
+    {{- include "ovpn-route.labels" $ | nindent 4 }}
+spec:
+  drop: {{ .Values.description.sizeTorChain }}
+  numberNode: {{ $params.numberNode }}
+  vpnFileConfig: {{ .Values.description.vpnFileConfig }}
+  inInterface: {{ $params.inInterface }}
+  {{- if $params.ipGateWay }}
+  ipGateWay: $params.ipGateWay
+  {{- end }}
+  outInterface: {{ $params.outInterface }}
+  image: {{ $params.image }}
+  switchServer: 0
+  {{- with .Values.nodeSelector }}
+  nameK8sNode: {{ toYaml . | nindent 8 }}
+  {{- end }}
+{{- end }}
+

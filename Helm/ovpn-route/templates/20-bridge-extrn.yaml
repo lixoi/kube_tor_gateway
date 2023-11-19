@@ -1,0 +1,30 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: br-extrn-conf
+  namespace: {{ .Release.Name }}
+spec:
+  config: '{
+      "cniVersion": "0.4.0",
+      "plugins": [
+        {
+          "type": "bridge",
+          "bridge": "extrnbr4",
+          "isGateway": true,
+          "isDefaultGateway": true,
+          "ipMasq": true,
+          "master": "ens19",
+          "ipam": {
+            "type": "host-local",
+            "subnet": "172.10.1.0/24",
+            "rangeStart": "172.10.1.3",
+            "rangeEnd": "172.10.1.5",
+            "gateway": "172.10.1.1"
+          }
+        },
+        {
+          "type": "firewall",
+          "backend": "iptables"
+        }
+      ]
+    }'

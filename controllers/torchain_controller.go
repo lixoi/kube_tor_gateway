@@ -32,12 +32,21 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	torchainv1alpha1 "github.com/operator-framework/operator-sdk/api/v1alpha1"
+)
+
+const (
+	Instance                 = "instance"
+	TorGateWay               = "torgateway"
+	SidecarImage             = "busybox"
+	InitialDelaySecondsParam = 10
+	PeriodSecondsParam       = 5
+	TimeoutSecondsParam      = 2
+	FailureThresholdParam    = 2
 )
 
 var (
@@ -142,13 +151,19 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err != nil {
 		// 2: (create)
 		if errors.IsNotFound(err) {
+
 			return ctrl.Result{}, r.createDeployment(ctx, node)
 		}
 	}
 
 	// 3:
-	secret := &corev1.Secret{}
-	err = r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, secret)
+	secret, err := createSecret(ctx, node)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	node.Status.Connected = true
+	r.Update(ctx, secret)
+	r.Update(ctx, deploy)
 
 	return ctrl.Result{}, nil
 }
@@ -217,7 +232,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 	if err != nil {
 		return err
 	}
-	// 2.3 (create  deployment with sidecar)
+	// 2.3 (create deployment with sidecar)
 	// 2.3.1 create secret
 	secret, err := createSecret(ctx, node)
 	if err != nil {
@@ -233,17 +248,17 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 		ObjectMeta: ctrl.ObjectMeta{
 			Namespace: node.Namespace,
 			Name:      node.Name,
-			Labels:    map[string]string{"instance": "torgateway"},
+			Labels:    map[string]string{Instance: TorGateWay},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &v1.LabelSelector{
-				MatchLabels: map[string]string{"instance": "torgateway"},
+				MatchLabels: map[string]string{Instance: TorGateWay},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: ctrl.ObjectMeta{
 					Annotations: map[string]string{netattachdef.NetworkAttachmentAnnot: "[" + string(jsonInNetAnnotation) + "," + string(jsonOutNetAnnotation) + "]"},
-					Labels:      map[string]string{"instance": "torgateway"},
+					Labels:      map[string]string{Instance: TorGateWay},
 				},
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
@@ -251,7 +266,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 							Name: node.Name + "-sec",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: node.Name,
+									SecretName: node.Name + "-secret",
 								},
 							},
 						},
@@ -264,7 +279,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            node.Name,
+							Name:            node.Name + "-vpn-client",
 							Image:           node.Spec.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Resources:       corev1.ResourceRequirements{},
@@ -275,7 +290,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 								},
 								{
 									Name:  "CONF",
-									Value: "/config/client.vpn",
+									Value: node.Spec.VpnFileConfig, //"/config/client.vpn"
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -293,18 +308,18 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 							},
 						},
 						{
-							Name:  node.Name + "sidecar-healthcheck",
-							Image: "busybox",
+							Name:  node.Name + "-sidecar-healthcheck",
+							Image: SidecarImage,
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"wget", "-T2", "-O-", "ya.ru"},
 									},
 								},
-								InitialDelaySeconds: 10,
-								PeriodSeconds:       5,
-								TimeoutSeconds:      2,
-								FailureThreshold:    2,
+								InitialDelaySeconds: InitialDelaySecondsParam,
+								PeriodSeconds:       PeriodSecondsParam,
+								TimeoutSeconds:      TimeoutSecondsParam,
+								FailureThreshold:    FailureThresholdParam,
 							},
 						},
 					},
@@ -339,7 +354,6 @@ func (r *TorChainReconciler) getNetworkDefinition(ctx context.Context, nameSpace
 func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1.Secret, error) {
 	vpnConfig := make(map[string]string)
 	vpnConfig[node.Spec.VpnFileConfig] = "get secret from Vault"
-	// get secret from vault
 	newSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -347,7 +361,7 @@ func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: node.Namespace,
-			Name:      node.Name,
+			Name:      node.Name + "-secret",
 		},
 		Type:       corev1.SecretTypeOpaque,
 		Data:       map[string][]byte{},
@@ -364,7 +378,7 @@ func (r *TorChainReconciler) snifferTorChains(ctx context.Context) error {
 	defer r.mux.Unlock()
 	listAllPods := &corev1.PodList{}
 	listOpts := []client.ListOption{
-		client.MatchingLabels{"instance": "torgateway"},
+		client.MatchingLabels{Instance: TorGateWay},
 	}
 
 	controllerLog.Info("func snifferTorChains: start")
@@ -375,7 +389,6 @@ func (r *TorChainReconciler) snifferTorChains(ctx context.Context) error {
 		}
 		nameSpaces := make([]string, 1, 5)
 		for _, pod := range listAllPods.Items {
-			isInitialized := false
 			controllerLog.Info("func snifferTorChains: range pods")
 			// break
 			for _, podContainer := range pod.Status.ContainerStatuses {
@@ -389,25 +402,10 @@ func (r *TorChainReconciler) snifferTorChains(ctx context.Context) error {
 				}
 
 			}
-			for _, podCondition := range pod.Status.Conditions {
-				switch podCondition.Type {
-				case "Initialized":
-					if podCondition.Status == "True" {
-						isInitialized = true
-					}
-				case "Ready":
-					if podCondition.Status == "False" && isInitialized == true && !slices.Contains(nameSpaces, pod.Namespace) {
-						nameSpaces = append(nameSpaces, pod.Namespace)
-						r.wg.Add(1)
-						go r.updateNodeTorChain(ctx, pod.Namespace)
-					}
-				}
-			}
-
 		}
 		r.wg.Wait()
 
-		time.Sleep(10 * time.Second)
+		time.Sleep((PeriodSecondsParam + TimeoutSecondsParam + FailureThresholdParam) * time.Second)
 	}
 
 	return nil
@@ -424,25 +422,18 @@ func (r *TorChainReconciler) updateNodeTorChain(ctx context.Context, nameSpace s
 	listPodsInNameSpace := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(nameSpace),
-		client.MatchingLabels{"instance": "torgateway"},
-		//client.MatchingFields{"restarts.phase": "1"},
+		client.MatchingLabels{Instance: TorGateWay},
 	}
 	if err := r.List(ctx, listPodsInNameSpace, listOpts...); err != nil {
 		return
 	}
 	crd_deploy := &torchainv1alpha1.TorChain{}
 	for _, pod := range listPodsInNameSpace.Items {
-		isInitialized := false
-		for _, podCondition := range pod.Status.Conditions {
-			switch podCondition.Type {
-			case "Initialized":
-				if podCondition.Status == "True" {
-					isInitialized = true
-				}
-			case "Ready":
-				if podCondition.Status == "True" || isInitialized == false {
-					break
-				}
+		for _, podContainer := range pod.Status.ContainerStatuses {
+			if !strings.HasSuffix(podContainer.Name, "sidecar-healthcheck") {
+				continue
+			}
+			if podContainer.LastTerminationState.Terminated != nil && podContainer.LastTerminationState.Terminated.Reason == "Error" {
 				current_crd_deploy := &torchainv1alpha1.TorChain{}
 				err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: nameSpace}, current_crd_deploy)
 				if err != nil {

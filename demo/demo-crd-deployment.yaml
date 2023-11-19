@@ -12,16 +12,16 @@ spec:
   # TODO(user): Add fields here
   # metadata (init network interfaces)
   numberNode: 1 # 2, 3, ...
-  typeNode: open_vpn # or wireguard
-  nameTorChain: my_tor_gateway
+  ## typeNode: open_vpn # or wireguard
+  ## nameTorChain: my_tor_gateway
   # environments
-  # gateway: ip_gateway # external ip gateway = 172.10.1.1
   vpnFileConfig: config_file_name
   # volumeMounts
-  tmpDir: tmp_directory
+  ## tmpDir: tmp_directory
   # interfaces
   inInterface: br-lan2-conf
   outInterface: br-extrn-conf
+  ipGateWay: ip_gateway # external ip gateway = 172.10.1.1
   # vpnDirConfig: configuration_directory
   # image
   image: image_vpn_client
