@@ -155,7 +155,6 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, r.createDeployment(ctx, node)
 		}
 	}
-
 	// 3:
 	secret, err := createSecret(ctx, node)
 	if err != nil {

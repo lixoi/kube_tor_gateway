@@ -3,10 +3,10 @@
 apiVersion: torchain.gate.way/v1alpha1
 kind: TorChain
 metadata:
-  name: {{ include "ovpn-route.fullname" $ }}-{{ $client }}
+  name: {{ include "tor-gateway.fullname" $ }}-{{ $client }}
   namespace: {{ $.Release.Name }}
   labels:
-    {{- include "ovpn-route.labels" $ | nindent 4 }}
+    {{- include "tor-gateway.labels" $ | nindent 4 }}
 spec:
   drop: {{ .Values.description.sizeTorChain }}
   numberNode: {{ $params.numberNode }}
