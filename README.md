@@ -31,38 +31,34 @@ VPN-клиенты логируют сообщения в stdout.
 
 На четвертом этапе разработан оператор, который создает узлы цепочки в соответствии с заданной в chart-е (папка Helm/tor-gateway) концигурацией и отслеживает состояние доступности внешних узлов.
 
-На текущем этапе - интеграция с ELK и Vault.
+На текущем этапе - интеграция с ELK.
 
 # HELM Chart
 
 Необходимость Chart-а обусловлена описанием концигурации сетевых интерфейсов клиентских узлов цепочки в соответствии с конфигурацией физической сети кластера, а также заданием параметров каждого узла цепочки на основе CRD TorChain:
 
     type TorChainSpec struct {
-        // INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-        // Important: Run "make" to regenerate code after modifying this file
-
-        //drop of vpn chain
-        DropVPNChain int `json:"drop,omitempty"`
-        // number node of chain
-        NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
-        // counter of switched to enother VPN Server
-        SwitchServer int `json:"switchServer,omitempty"`
-        // environments:
-        // ip gateway
-        IPGateWay string `json:"ipGateWay,omitempty"`
-        // volumeMounts:
-        // file name VPN config
-        VpnFileConfig string `json:"vpnFileConfig,omitempty"`
-        // interfaces:
-        // input traffic
-        InInterface string `json:"inInterface,omitempty"`
-        // output traffic
-        OutInterface string `json:"outInterface,omitempty"`
-        // image VPN client
-        Image string `json:"image,omitempty"`
-        // nodeSelector
-        NameK8sNode string `json:"nameK8sNode,omitempty"`
-    }
+		//drop of vpn chain
+		DropVPNChain int `json:"drop,omitempty"`
+		// number node of chain
+		NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
+		// environments:
+		// ip gateway
+		IPGateWay string `json:"ipGateWay,omitempty"`
+		// list of VPN configs in vault
+		VpnSecretNames []string `json:"vpnSecretNames,omitempty"`
+		// current VPN config
+		VpnSecretName string `json:"vpnSecretName,omitempty"`
+		// interfaces:
+		// input traffic
+		InInterface string `json:"inInterface,omitempty"`
+		// output traffic
+		OutInterface string `json:"outInterface,omitempty"`
+		// image VPN client
+		Image string `json:"image,omitempty"`
+		// nodeSelector
+		NameK8sNode string `json:"nameK8sNode,omitempty"`
+	}
 
 В примере описывается (по мнению автора) оптимальная конфигурация:
 1. Все узлы цепочки запускаются на определенной НОДе кластера (через NodeSelector)
@@ -85,11 +81,71 @@ VPN-клиенты логируют сообщения в stdout.
 3. Функция snifferTorChains:
     - Определяет в каком NameSpace есть ПОД со статусом false.
     - Так как 'вехний' по вложенности ПОД, в случае недоступности сервера, будет блокировать трафик всем ПОДам уровней 'ниже', в найденном NameSpace функция находит самый 'верхний' (наименьший по нумерации) ПОД со статусом false. 
-    - Для найденного ПОДа изменяется значение SwitchServer в спецификации и обновляется манифест (для инициализации события update). 
+     - Для найденного ПОДа изменяется значение VpnSecretName в спецификации и обновляется манифест (для инициализации события update). В значении указывается имя следующего секрета (параметры доступа к следующему серверу) из VpnSecretNames, который необходимо применить. 
    
 При такой реализации будет происходить последовательное восстановление связи от 'верхнего' узла цепочки к 'нижнему' (по вложенности). 
    
 Таймаут итерации сканирования в snifferTorChains задан больше, чем PeriodSeconds+TimeoutSeconds в LivenessProbe. Это условие позволяет гарантировать, что snifferTorChains не обновит спецификацию манифеста прежде, чем не отработает LivenessProbe после предыдущего обновления.
+
+# Vault
+
+Логика оператора основана на интеграции с Vault через vault-secrets-operator. 
+
+Перед инициализацией VPN-цепочки необходимо:
+ - На сервисе Vault:
+   1. Инициализировать протокол и метод аутентификации в vault - kubernetes
+   2. Инициировать секрет типа ключ-значение по (напр.) kvv2
+   3. создать роль на доступ к секретам (read) и привязать ее к сервис-акканту пользователяя, который будет создавать цепочку, а так же привязать к namespace, в котором будет развернута цепочка (Release.Name в helm chart!).
+   4. Записать необходимое количество параметров доступа к серверам. Например:
+		- vault kv put kvv2/ns/number-node-chain/domain/city/server/wg client.vpn="creds-in-base64"
+		- vault kv put kvv2/ns/number-node-chain/domain/city/server/ovpn client.vpn="creds-in-base64"
+			где:
+				ns - namespace (Release.Name)
+				number-node-chain - номер узла в цепочке 
+				domain - страна
+				city - город (регион)
+				server - сервер
+				ovpn/wp - тип подключения
+	Ключ строго фиксирован (client.vpn), так как по имени ключча создается конфигурационный файл. Данное имя задано в коде оператора.
+ - В кластере:
+	1. Инициировать аутентификацию для секрета:
+		Например:
+			apiVersion: secrets.hashicorp.com/v1beta1
+			kind: VaultAuth
+			metadata:
+  			  name: static-auth
+  			  namespace: {{ $.Release.Name }}	
+			spec:
+  			  method: kubernetes
+  			  mount: tor-auth-mount # auth path
+  			kubernetes:
+    		  role: role-name 
+    		  serviceAccount: user-service-account # default
+    		  audiences:
+      		    - vault
+	2. Создать ресурсы VaultStaticSecret, которые монтирую конфигурационные параметры доступа (п.4) к label (имени секрета)
+		Например:
+			apiVersion: secrets.hashicorp.com/v1beta1
+			kind: VaultStaticSecret
+			metadata:
+			  name: domain1-city1-server1
+			  namespace: {{ $.Release.Name }}	
+			spec:
+			  type: kv-v2
+			  # mount path
+			  mount: kvv2
+			  # path of the secret
+			  path: ns/number-node-chain/domain/city/server/wg
+			  # dest k8s secret
+			  destination:
+				name: domain1-city1-server1
+				create: true
+			  # static secret refresh interval
+			  refreshAfter: 1h
+			  # Name of the CRD to authenticate to Vault
+			  vaultAuthRef: static-auth
+
+Таким образом, в переменной кастомного ресурса tor-оператора VpnSecretNames задается список имен секретов (из ресурсов VaultStaticSecret), которые можно задавать для конкретного узла цепочки. 
 
 # Сборка образа при помощи пакетного менеджера nix (nixpkgs)
 
