@@ -162,11 +162,18 @@ func (r *TorChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 	node.Status.Connected = true
 	r.Update(ctx, secret)
+	for i, volume := range deploy.Spec.Template.Spec.Volumes {
+		if volume.Name == node.Name+"-sec" {
+			deploy.Spec.Template.Spec.Volumes[i].VolumeSource.Secret.SecretName = node.Spec.VpnSecretName
+		}
+
+	}
 	r.Update(ctx, deploy)
 
 	return ctrl.Result{}, nil
 }
 
+// создание узла при инициализации цепочки
 func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchainv1alpha1.TorChain) error {
 	var (
 		interfaceName string
@@ -231,6 +238,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 	if err != nil {
 		return err
 	}
+
 	// 2.3 (create deployment with sidecar)
 	// 2.3.1 create secret
 	secret, err := createSecret(ctx, node)
@@ -265,7 +273,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 							Name: node.Name + "-sec",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: node.Name + "-secret",
+									SecretName: node.Spec.VpnSecretName,
 								},
 							},
 						},
@@ -289,7 +297,7 @@ func (r *TorChainReconciler) createDeployment(ctx context.Context, node *torchai
 								},
 								{
 									Name:  "CONF",
-									Value: node.Spec.VpnFileConfig, //"/config/client.vpn"
+									Value: "/config/client.vpn", // you need to synchroniation with Vault
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -351,8 +359,11 @@ func (r *TorChainReconciler) getNetworkDefinition(ctx context.Context, nameSpace
 }
 
 func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1.Secret, error) {
-	vpnConfig := make(map[string]string)
-	vpnConfig[node.Spec.VpnFileConfig] = "get secret from Vault"
+
+	if len(node.Spec.VpnSecretNames) == 0 || node.Spec.VpnSecretName == "" {
+		return nil, errors.NewResourceExpired("Not init secrets in specification resource")
+	}
+
 	newSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -360,11 +371,11 @@ func createSecret(ctx context.Context, node *torchainv1alpha1.TorChain) (*corev1
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: node.Namespace,
-			Name:      node.Name + "-secret",
+			Name:      node.Spec.VpnSecretName,
 		},
-		Type:       corev1.SecretTypeOpaque,
-		Data:       map[string][]byte{},
-		StringData: vpnConfig,
+		// Type:       corev1.SecretTypeOpaque,
+		// Data:       map[string][]byte{},
+		// StringData: vpnConfig,
 	}
 
 	return newSecret, nil
@@ -444,8 +455,17 @@ func (r *TorChainReconciler) updateNodeTorChain(ctx context.Context, nameSpace s
 			}
 		}
 	}
+
+	// выбор секрета (конфигурационного файла ) из списка в спецификации
+	// выбор следующего по списку
+	for i, secret := range crd_deploy.Spec.VpnSecretNames {
+		if strings.Compare(crd_deploy.Spec.VpnSecretName, secret) == 0 {
+			crd_deploy.Spec.VpnSecretName = crd_deploy.Spec.VpnSecretNames[(i+1)%len(crd_deploy.Spec.VpnSecretNames)]
+			break
+		}
+	}
+
 	crd_deploy.Status.Connected = false
-	crd_deploy.Spec.SwitchServer += 1
 	r.Update(ctx, crd_deploy)
 }
 

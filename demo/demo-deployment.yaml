@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: demo-deployment
+  namespace: release
   labels:
     instance: torgateway
 spec:
@@ -14,16 +15,24 @@ spec:
       labels:
         instance: torgateway
     spec:
+      volumes:
+        - name: cred-3
+          secret:
+            secretName: first-node-secret
       containers:
       - name: demo-client-pod
-        image: demo-client
+        image: demo-image:latest
         imagePullPolicy: IfNotPresent
-      - name: sidecar-container
-        image: busybox
-        livenessProbe:
-          exec:
-            command: ["wget", "-T2", "-O-", "ya.ru"]
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 2
+        volumeMounts:
+          - name: cred-3
+            readOnly: true
+            mountPath: /config
+              #- name: sidecar-container
+              #image: busybox
+              #livenessProbe:
+              #exec:
+              #command: ["wget", "-T2", "-O-", "ya.ru"]
+              #initialDelaySeconds: 10
+              #periodSeconds: 5
+              #timeoutSeconds: 2
 

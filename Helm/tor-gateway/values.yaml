@@ -6,7 +6,6 @@ replicaCount: 1
 
 description:
   sizeTorChain: 3
-  vpnFileConfig: "/config/client.vpn"
 
 annotationsCain:
   externalNodeChain:
@@ -14,16 +13,30 @@ annotationsCain:
     inInterface: br-lan2-conf
     outInterface: br-extrn-conf
     image: "tor-chain/ovpn-clien:v1"
-  middleNodeChain:
+    vpnSecretNames: 
+      - domain1-city1-srv1
+      - domain2-city1-srv1
+      - domain1-city2-srv1]
+    vpnSecretName: dn1-city1-srv1
     numberNode: 2
     inInterface: br-lan1-conf
     outInterface: br-lan2-conf
     image: "tor-chain/ovpn-clien:v1"
+    vpnSecretNames: 
+      - domain3-city1-srv1
+      - domain3-city2-srv1
+      - domain3-city1-srv1
+    vpnSecretName: dn1-city1-srv1
   internalNodeChain:
     numberNode: 3
     inInterface: macvlan-intrn-conf
     outInterface: br-lan1-conf
     image: "tor-chain/wg-client:v1"
+    vpnSecretNames: 
+      - domain5-city1-srv1
+      - domain5-city2-srv1 
+      - domain5-city1-srv1
+    vpnSecretName: dn1-city1-srv1
     ipGateWay: 172.10.1.1
 
 imagePullSecrets: []

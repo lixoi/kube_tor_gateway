@@ -33,14 +33,13 @@ type TorChainSpec struct {
 	DropVPNChain int `json:"drop,omitempty"`
 	// number node of chain
 	NumberNode int `json:"numberNode,omitempty"` // 1 or 2 or 3
-	// counter of switched to enother VPN Server
-	SwitchServer int `json:"switchServer,omitempty"`
 	// environments:
 	// ip gateway
 	IPGateWay string `json:"ipGateWay,omitempty"`
-	// volumeMounts:
-	// file name VPN config
-	VpnFileConfig string `json:"vpnFileConfig,omitempty"`
+	// list of VPN configs in vault
+	VpnSecretNames []string `json:"vpnSecretNames,omitempty"`
+	// current VPN config
+	VpnSecretName string `json:"vpnSecretName,omitempty"`
 	// interfaces:
 	// input traffic
 	InInterface string `json:"inInterface,omitempty"`

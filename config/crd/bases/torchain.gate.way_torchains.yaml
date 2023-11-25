@@ -57,12 +57,14 @@ spec:
               outInterface:
                 description: output traffic
                 type: string
-              switchServer:
-                description: counter of switched to enother VPN Server
-                type: integer
-              vpnFileConfig:
-                description: 'volumeMounts: file name VPN config'
+              vpnSecretName:
+                description: current VPN config
                 type: string
+              vpnSecretNames:
+                description: list of VPN configs in vault
+                items:
+                  type: string
+                type: array
             type: object
           status:
             description: TorChainStatus defines the observed state of TorChain текущее

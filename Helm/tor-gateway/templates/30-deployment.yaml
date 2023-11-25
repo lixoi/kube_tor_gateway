@@ -10,14 +10,14 @@ metadata:
 spec:
   drop: {{ .Values.description.sizeTorChain }}
   numberNode: {{ $params.numberNode }}
-  vpnFileConfig: {{ .Values.description.vpnFileConfig }}
   inInterface: {{ $params.inInterface }}
   {{- if $params.ipGateWay }}
   ipGateWay: $params.ipGateWay
   {{- end }}
   outInterface: {{ $params.outInterface }}
   image: {{ $params.image }}
-  switchServer: 0
+  vpnSecretNames: {{  $params.vpnSecretNames }}
+  vpnSecretName: {{  $params.vpnSecretName }}
   {{- with .Values.nodeSelector }}
   nameK8sNode: {{ toYaml . | nindent 8 }}
   {{- end }}
