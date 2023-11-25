@@ -94,22 +94,25 @@ VPN-клиенты логируют сообщения в stdout.
 Перед инициализацией VPN-цепочки необходимо:
  - На сервисе Vault:
    1. Инициализировать протокол и метод аутентификации в vault - kubernetes
-   2. Инициировать секрет типа ключ-значение по (напр.) kvv2
-   3. создать роль на доступ к секретам (read) и привязать ее к сервис-акканту пользователяя, который будет создавать цепочку, а так же привязать к namespace, в котором будет развернута цепочка (Release.Name в helm chart!).
+   2. Инициировать секрет типа ключ-значение по пути kvv2
+   3. Создать роль на доступ к секретам (read) и привязать ее к сервис-акканту пользователя, который будет создавать цепочку, а так же привязать к namespace, в котором будет развернута цепочка (Release.Name в helm chart!).
    4. Записать необходимое количество параметров доступа к серверам. Например:
 		- vault kv put kvv2/ns/number-node-chain/domain/city/server/wg client.vpn="creds-in-base64"
 		- vault kv put kvv2/ns/number-node-chain/domain/city/server/ovpn client.vpn="creds-in-base64"
+
 			где:
-				ns - namespace (Release.Name)
-				number-node-chain - номер узла в цепочке 
-				domain - страна
-				city - город (регион)
-				server - сервер
-				ovpn/wp - тип подключения
+			- ns - namespace (Release.Name)
+			- number-node-chain - номер узла в цепочке 
+			- domain - страна
+			- city - город (регион)
+			- server - сервер
+			- ovpn/wp - тип подключения
+
 	Ключ строго фиксирован (client.vpn), так как по имени ключча создается конфигурационный файл. Данное имя задано в коде оператора.
  - В кластере:
 	1. Инициировать аутентификацию для секрета:
 		Например:
+        ```
 			apiVersion: secrets.hashicorp.com/v1beta1
 			kind: VaultAuth
 			metadata:
@@ -123,8 +126,10 @@ VPN-клиенты логируют сообщения в stdout.
     		  serviceAccount: user-service-account # default
     		  audiences:
       		    - vault
+        ```
 	2. Создать ресурсы VaultStaticSecret, которые монтирую конфигурационные параметры доступа (п.4) к label (имени секрета)
 		Например:
+        ```
 			apiVersion: secrets.hashicorp.com/v1beta1
 			kind: VaultStaticSecret
 			metadata:
@@ -144,7 +149,7 @@ VPN-клиенты логируют сообщения в stdout.
 			  refreshAfter: 1h
 			  # Name of the CRD to authenticate to Vault
 			  vaultAuthRef: static-auth
-
+        ```
 Таким образом, в переменной кастомного ресурса tor-оператора VpnSecretNames задается список имен секретов (из ресурсов VaultStaticSecret), которые можно задавать для конкретного узла цепочки. 
 
 # Сборка образа при помощи пакетного менеджера nix (nixpkgs)
