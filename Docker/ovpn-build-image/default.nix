@@ -21,13 +21,16 @@ exec openvpn --config $CONF
  in
   pkgs.dockerTools.buildImage {
 	inherit name tag;
-	contents = [
-		pkgs.bash
-		pkgs.openvpn
-		pkgs.coreutils
-		pkgs.iproute2
-		pkgs.iptables
-	];
+	copyToRoot = pkgs.buildEnv {
+		name = "wireguard";
+		paths = [
+			pkgs.bash
+			pkgs.openvpn
+			pkgs.coreutils
+			pkgs.iproute2
+			pkgs.iptables
+		];
+	}
 	config = {
 		WorkingDir = "/config";
 		Env = [
